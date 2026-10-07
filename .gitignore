@@ -1,8 +1,13 @@
+# Dependencies
 node_modules/
+
+# Build / generated files
+dist/
 target/
 _out/
 gen/
 
+# CAP
 .cdsrc-private.json
 default-*.json
 *.sqlite
@@ -18,5 +23,6 @@ mta_archives/
 # @cap-js/cds-typer
 @cds-models
 
-./test.pdf
+# Local files
+test.pdf
 .env

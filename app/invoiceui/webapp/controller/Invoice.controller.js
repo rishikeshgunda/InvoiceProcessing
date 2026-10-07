@@ -164,7 +164,7 @@ sap.ui.define([
 
                     const response =
                         await fetch(
-                            "/invoice/upload",
+                            "./upload",
                             {
                                 method: "POST",
                                 body: formData

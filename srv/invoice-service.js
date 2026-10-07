@@ -2,55 +2,30 @@ import cds from '@sap/cds';
 import multer from 'multer';
 import 'dotenv/config';
 
-
-// ============================================================
-// FILE UPLOAD CONFIGURATION
-// ============================================================
-
-// Store the uploaded PDF in memory.
-// We don't need to save the invoice PDF to disk because
-// Document AI can process the file directly from memory.
-
 const upload = multer({
     storage: multer.memoryStorage()
 });
 
-
-// ============================================================
-// DOCUMENT AI - AUTHENTICATION
-// ============================================================
-
-// Get an OAuth access token from Document AI.
-//
-// The token is obtained using the client credentials
-// configured in the .env file.
-
 async function getAccessToken() {
-
     const credentials = Buffer
         .from(
             `${process.env.DOCUMENT_AI_CLIENT_ID}:${process.env.DOCUMENT_AI_CLIENT_SECRET}`
         )
         .toString('base64');
 
-
     const response = await fetch(
         `${process.env.DOCUMENT_AI_AUTH_URL}/oauth/token`,
         {
             method: 'POST',
-
             headers: {
                 'Authorization': `Basic ${credentials}`,
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
-
             body: 'grant_type=client_credentials'
         }
     );
 
-
     if (!response.ok) {
-
         const error = await response.text();
 
         throw new Error(
@@ -58,31 +33,18 @@ async function getAccessToken() {
         );
     }
 
-
     const data = await response.json();
 
     return data.access_token;
 }
 
-
-// ============================================================
-// DOCUMENT AI - TEMPLATE LOOKUP
-// ============================================================
-
-// Find the configured Document AI template dynamically.
-//
-// We intentionally do not hardcode the template ID because
-// the template ID can change between environments.
-
 async function getTemplate(accessToken) {
-
     const response = await fetch(
         `${process.env.DOCUMENT_AI_URL}/document-information-extraction/v1/templates?clientId=${encodeURIComponent(
             process.env.DOCUMENT_AI_TEMPLATE_CLIENT_ID
         )}`,
         {
             method: 'GET',
-
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Accept': 'application/json'
@@ -90,9 +52,7 @@ async function getTemplate(accessToken) {
         }
     );
 
-
     if (!response.ok) {
-
         const error = await response.text();
 
         throw new Error(
@@ -100,45 +60,25 @@ async function getTemplate(accessToken) {
         );
     }
 
-
     const data = await response.json();
 
     const templates = data.results || [];
 
-
     const template = templates.find(
-        item =>
-            item.name === process.env.DOCUMENT_AI_TEMPLATE_NAME
+        item => item.name === process.env.DOCUMENT_AI_TEMPLATE_NAME
     );
 
-
     if (!template) {
-
         throw new Error(
             `Template '${process.env.DOCUMENT_AI_TEMPLATE_NAME}' not found`
         );
     }
 
-
     return template;
 }
 
-
-// ============================================================
-// DOCUMENT AI - SUBMIT DOCUMENT
-// ============================================================
-
-// Send the uploaded invoice PDF to Document AI.
-//
-// The template information is obtained dynamically from
-// getTemplate().
-
 async function processDocument(accessToken, template, file) {
-
     const formData = new FormData();
-
-
-    // Convert the uploaded PDF buffer into a Blob.
 
     const pdfBlob = new Blob(
         [file.buffer],
@@ -147,15 +87,11 @@ async function processDocument(accessToken, template, file) {
         }
     );
 
-
     formData.append(
         'file',
         pdfBlob,
         file.originalname
     );
-
-
-    // Tell Document AI which template/schema should be used.
 
     const options = {
         clientId: template.clientId,
@@ -164,30 +100,24 @@ async function processDocument(accessToken, template, file) {
         templateId: template.id
     };
 
-
     formData.append(
         'options',
         JSON.stringify(options)
     );
 
-
     const response = await fetch(
         `${process.env.DOCUMENT_AI_URL}/document-information-extraction/v1/document/jobs`,
         {
             method: 'POST',
-
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Accept': 'application/json'
             },
-
             body: formData
         }
     );
 
-
     if (!response.ok) {
-
         const error = await response.text();
 
         throw new Error(
@@ -195,43 +125,26 @@ async function processDocument(accessToken, template, file) {
         );
     }
 
-
     return await response.json();
 }
 
-
-// ============================================================
-// DOCUMENT AI - WAIT FOR JOB
-// ============================================================
-
-// Poll Document AI until the extraction job finishes.
-//
-// The completed job response already contains the extracted
-// invoice data, so there is no separate /result call.
-
 async function waitForJob(accessToken, jobId) {
-
     const maxAttempts = 15;
-
     const interval = 2000;
-
 
     for (
         let attempt = 1;
         attempt <= maxAttempts;
         attempt++
     ) {
-
         console.log(
             `Checking job status (${attempt}/${maxAttempts})...`
         );
-
 
         const response = await fetch(
             `${process.env.DOCUMENT_AI_URL}/document-information-extraction/v1/document/jobs/${jobId}`,
             {
                 method: 'GET',
-
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'Accept': 'application/json'
@@ -239,9 +152,7 @@ async function waitForJob(accessToken, jobId) {
             }
         );
 
-
         if (!response.ok) {
-
             const error = await response.text();
 
             throw new Error(
@@ -249,119 +160,64 @@ async function waitForJob(accessToken, jobId) {
             );
         }
 
-
         const job = await response.json();
-
 
         console.log(
             `Job ${jobId} status: ${job.status}`
         );
 
-
-        // Document AI finished successfully.
-
         if (job.status === 'DONE') {
-
             console.log(
                 'Document AI processing completed.'
             );
 
-
             return job;
         }
-
-
-        // Document AI explicitly failed.
 
         if (
             job.status === 'FAILED' ||
             job.status === 'ERROR'
         ) {
-
             throw new Error(
                 `Document AI job failed with status: ${job.status}`
             );
         }
-
-
-        // Wait before checking again.
 
         await new Promise(
             resolve => setTimeout(resolve, interval)
         );
     }
 
-
     throw new Error(
         'Document AI job timed out after 30 seconds'
     );
 }
 
-
-// ============================================================
-// EXTRACT INVOICE FIELDS
-// ============================================================
-
-// Convert Document AI's headerFields array into a simple
-// JavaScript object.
-//
-// Example:
-//
-// [
-//   { name: "supplierName", value: "THERMAX LIMITED PUNE" },
-//   { name: "grandTotal", value: "1000.00" }
-// ]
-//
-// becomes:
-//
-// {
-//   supplierName: "THERMAX LIMITED PUNE",
-//   grandTotal: "1000.00"
-// }
-
 function extractInvoiceFields(job) {
-
     const fields = {};
-
 
     const headerFields =
         job?.extraction?.headerFields || [];
 
-
     for (const field of headerFields) {
-
         fields[field.name] =
             field.value ?? "";
     }
 
-
     return fields;
 }
 
-
-// ============================================================
-// BPA - AUTHENTICATION
-// ============================================================
-
-// Get an OAuth access token for SAP Build Process Automation.
-//
-// The BPA service key provides the client ID, client secret
-// and UAA URL required for client-credentials authentication.
-
 async function getBpaAccessToken() {
-
     const credentials = Buffer
         .from(
             `${process.env.BPA_CLIENT_ID}:${process.env.BPA_CLIENT_SECRET}`
         )
         .toString('base64');
 
-
     const response = await fetch(
         `${process.env.BPA_AUTH_URL}/oauth/token?grant_type=client_credentials`,
         {
             method: 'POST',
-
             headers: {
                 'Authorization': `Basic ${credentials}`,
                 'Accept': 'application/json'
@@ -369,9 +225,7 @@ async function getBpaAccessToken() {
         }
     );
 
-
     if (!response.ok) {
-
         const error = await response.text();
 
         throw new Error(
@@ -379,32 +233,17 @@ async function getBpaAccessToken() {
         );
     }
 
-
     const data = await response.json();
 
     return data.access_token;
 }
 
-
-// ============================================================
-// BPA - START WORKFLOW
-// ============================================================
-
-// Start the BPA workflow using the invoice data extracted
-// from Document AI.
-//
-// The workflow receives the same fields defined in the
-// workflow context.
-
 async function triggerBpa(accessToken, invoice) {
-
     const payload = {
-
         definitionId:
             process.env.BPA_DEFINITION_ID,
 
         context: {
-
             supplierinvoice:
                 invoice.invoiceNumber || "",
 
@@ -427,9 +266,6 @@ async function triggerBpa(accessToken, invoice) {
 
             grandtotal:
                 invoice.grandTotal || "",
-
-            // Convert Document AI date (YYYY-MM-DD)
-            // to BPA DateTime format.
 
             invoicedate:
                 invoice.invoiceDate
@@ -459,35 +295,27 @@ async function triggerBpa(accessToken, invoice) {
 
             taxableamount:
                 invoice.taxableAmount || ""
-
         }
-
     };
-
 
     console.log(
         'Starting BPA workflow...'
     );
 
-
     const response = await fetch(
         `${process.env.BPA_API_URL}/workflow/rest/v1/workflow-instances`,
         {
             method: 'POST',
-
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
             },
-
             body: JSON.stringify(payload)
         }
     );
 
-
     if (!response.ok) {
-
         const error = await response.text();
 
         throw new Error(
@@ -495,32 +323,19 @@ async function triggerBpa(accessToken, invoice) {
         );
     }
 
-
-    // Some workflow API responses contain JSON while some
-    // successful responses may have an empty body.
-
     const responseText = await response.text();
-
 
     let result = null;
 
-
     if (responseText) {
-
         try {
-
             result = JSON.parse(responseText);
-
         } catch {
-
             result = {
                 response: responseText
             };
-
         }
-
     }
-
 
     return {
         status: response.status,
@@ -528,106 +343,51 @@ async function triggerBpa(accessToken, invoice) {
     };
 }
 
-
-// ============================================================
-// CAP SERVICE IMPLEMENTATION
-// ============================================================
-
 export default cds.service.impl(function () {
-
     console.log(
         'InvoiceService initialized'
     );
 
-
     const app = cds.app;
 
-
-    // ========================================================
-    // POST /invoice/upload
-    // ========================================================
-
-    // This endpoint is called by the UI5 application.
-    //
-    // Complete flow:
-    //
-    // 1. Receive invoice PDF
-    // 2. Authenticate with Document AI
-    // 3. Find Document AI template
-    // 4. Submit invoice
-    // 5. Wait for extraction
-    // 6. Extract clean invoice fields
-    // 7. Authenticate with BPA
-    // 8. Start BPA workflow
-    // 9. Return clean response to UI5
-
     app.post(
-        '/invoice/upload',
-
+        '/upload',
         upload.single('file'),
-
         async (req, res) => {
-
             try {
-
-                // ====================================================
-                // 1. VALIDATE FILE
-                // ====================================================
-
                 if (!req.file) {
-
                     return res.status(400).json({
                         error: 'No file uploaded'
                     });
                 }
 
-
                 console.log(
                     `File received: ${req.file.originalname}`
                 );
 
-
-                // ====================================================
-                // 2. AUTHENTICATE WITH DOCUMENT AI
-                // ====================================================
-
                 const accessToken =
                     await getAccessToken();
-
 
                 console.log(
                     'Document AI authentication successful'
                 );
-
-
-                // ====================================================
-                // 3. FIND DOCUMENT AI TEMPLATE
-                // ====================================================
 
                 const template =
                     await getTemplate(
                         accessToken
                     );
 
-
                 console.log(
                     `Template found: ${template.name}`
                 );
-
 
                 console.log(
                     `Template ID: ${template.id}`
                 );
 
-
                 console.log(
                     `Schema ID: ${template.schemaId}`
                 );
-
-
-                // ====================================================
-                // 4. SUBMIT DOCUMENT TO DOCUMENT AI
-                // ====================================================
 
                 const job =
                     await processDocument(
@@ -636,19 +396,12 @@ export default cds.service.impl(function () {
                         req.file
                     );
 
-
                 const jobId =
                     job.id;
-
 
                 console.log(
                     `Document AI job created: ${jobId}`
                 );
-
-
-                // ====================================================
-                // 5. WAIT FOR DOCUMENT AI
-                // ====================================================
 
                 const completedJob =
                     await waitForJob(
@@ -656,21 +409,14 @@ export default cds.service.impl(function () {
                         jobId
                     );
 
-
-                // ====================================================
-                // 6. EXTRACT CLEAN INVOICE DATA
-                // ====================================================
-
                 const invoice =
                     extractInvoiceFields(
                         completedJob
                     );
 
-
                 console.log(
                     'Extracted invoice fields:'
                 );
-
 
                 console.log(
                     JSON.stringify(
@@ -680,23 +426,12 @@ export default cds.service.impl(function () {
                     )
                 );
 
-
-                // ====================================================
-                // 7. AUTHENTICATE WITH BPA
-                // ====================================================
-
                 const bpaAccessToken =
                     await getBpaAccessToken();
-
 
                 console.log(
                     'BPA authentication successful'
                 );
-
-
-                // ====================================================
-                // 8. START BPA WORKFLOW
-                // ====================================================
 
                 const bpaResult =
                     await triggerBpa(
@@ -704,18 +439,11 @@ export default cds.service.impl(function () {
                         invoice
                     );
 
-
                 console.log(
                     'BPA workflow started successfully.'
                 );
 
-
-                // ====================================================
-                // 9. RETURN CLEAN RESPONSE TO UI5
-                // ====================================================
-
                 return res.status(200).json({
-
                     message:
                         'Invoice processed and BPA workflow started successfully.',
 
@@ -725,41 +453,26 @@ export default cds.service.impl(function () {
                     invoice,
 
                     bpa: bpaResult
-
                 });
 
-
             } catch (error) {
-
-                // ====================================================
-                // ERROR HANDLING
-                // ====================================================
-
                 console.error(
                     'Invoice processing error:',
                     error
                 );
 
-
                 return res.status(500).json({
-
                     error:
                         'Invoice processing failed',
 
                     details:
                         error.message
-
                 });
-
             }
-
         }
-
     );
 
-
-    // ========================================================
-    // POST /invoice/upload implementation complete.
-    // ========================================================
-
+    console.log(
+        'POST /upload endpoint registered'
+    );
 });
