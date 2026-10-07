@@ -1,0 +1,118 @@
+<mvc:View
+    controllerName="com.invoiceui.invoiceui.controller.Invoice"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:unified="sap.ui.unified"
+    xmlns:form="sap.ui.layout.form">
+
+    <Page
+        id="page"
+        title="Invoice Processing">
+
+        <content>
+
+            <VBox id="_IDGenVBox" class="sapUiMediumMargin">
+
+                <Title id="_IDGenTitle"
+                    text="Upload Invoice"
+                    level="H2"
+                    class="sapUiSmallMarginBottom" />
+
+                <HBox id="_IDGenHBox1"
+                    alignItems="Center"
+                    class="sapUiSmallMarginBottom">
+
+                    <unified:FileUploader
+                        id="fileUploader"
+                        width="400px"
+                        fileType="pdf"
+                        placeholder="Choose an invoice PDF"
+                        change=".onFileChange" />
+
+                    <Button
+                        id="uploadButton"
+                        text="Upload Invoice"
+                        type="Emphasized"
+                        icon="sap-icon://upload"
+                        press=".onUpload"
+                        enabled="false"
+                        class="sapUiSmallMarginBegin" />
+
+                </HBox>
+
+                <MessageStrip
+                    id="statusMessage"
+                    visible="false"
+                    class="sapUiSmallMarginBottom" />
+
+                <Panel
+                    id="resultPanel"
+                    headerText="Extracted Invoice Details"
+                    visible="false"
+                    class="sapUiMediumMarginTop">
+
+                    <content>
+
+                        <form:SimpleForm
+                            id="invoiceForm"
+                            editable="false"
+                            layout="ResponsiveGridLayout">
+
+                            <Label id="_IDGenLabel" text="Supplier Name" />
+                            <Text id="supplierName" />
+
+                            <Label id="_IDGenLabel1" text="Vendor ID" />
+                            <Text id="supplierVendorId" />
+
+                            <Label id="_IDGenLabel2" text="Invoice Number" />
+                            <Text id="invoiceNumber" />
+
+                            <Label id="_IDGenLabel3" text="Invoice Date" />
+                            <Text id="invoiceDate" />
+
+                            <Label id="_IDGenLabel4" text="Company Code" />
+                            <Text id="companyCode" />
+
+                            <Label id="_IDGenLabel5" text="Invoice Type" />
+                            <Text id="invoiceType" />
+
+                            <Label id="_IDGenLabel6" text="Currency" />
+                            <Text id="currency" />
+
+                            <Label id="_IDGenLabel7" text="Taxable Amount" />
+                            <Text id="taxableAmount" />
+
+                            <Label id="_IDGenLabel8" text="Tax Amount" />
+                            <Text id="taxAmount" />
+
+                            <Label id="_IDGenLabel9" text="Tax Rate" />
+                            <Text id="taxRate" />
+
+                            <Label id="_IDGenLabel10" text="Grand Total" />
+                            <Text id="grandTotal" />
+
+                            <Label id="_IDGenLabel11" text="Payment Terms" />
+                            <Text id="paymentTerms" />
+
+                            <Label id="_IDGenLabel12" text="GL Account" />
+                            <Text id="glAccount" />
+
+                            <Label id="_IDGenLabel13" text="Cost Center" />
+                            <Text id="costCenter" />
+
+                            <Label id="_IDGenLabel14" text="Tax Code" />
+                            <Text id="taxCode" />
+
+                        </form:SimpleForm>
+
+                    </content>
+
+                </Panel>
+
+            </VBox>
+
+        </content>
+
+    </Page>
+
+</mvc:View>

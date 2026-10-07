@@ -11,6 +11,7 @@
   },
   "devDependencies": {
     "@cap-js/sqlite": "^3",
+    "@sap/cds-dk": "^10",
     "cds-plugin-ui5": "^0.17.0"
   },
   "scripts": {
@@ -26,7 +27,10 @@
       "[production]": {
         "db": "hana",
         "auth": "xsuaa"
-      }
+      },
+      "destinations": true,
+      "html5-repo": true,
+      "workzone": true
     }
   },
   "workspaces": [
